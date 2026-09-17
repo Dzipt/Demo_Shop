@@ -56,7 +56,7 @@ permissions:
   contents: read
 
 env:
-  ALLURE_ENDPOINT: ${{ vars.ALLURE_ENDPOINT }}
+  ALLURE_ENDPOINT: https://demo.qatools.cloud/
   ALLURE_PROJECT_ID: 574
   ALLURE_TOKEN: ${{ secrets.ALLURE_TOKEN }}
   ALLURE_RESULTS: allure-results
