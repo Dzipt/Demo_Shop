@@ -24,9 +24,8 @@ on:
         default: "Moscow"
         type: choice
         options:
-          - Москва
-          - Казань
-          - Новосибирск
+          - Moscow
+          - Vladiivostok
       RELEASE:
         description: "Версия релиза"
         required: true
