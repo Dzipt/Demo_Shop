@@ -21,7 +21,7 @@ on:
       CITY:
         description: "Город"
         required: true
-        default: "Москва"
+        default: "Moscow"
         type: choice
         options:
           - Москва
