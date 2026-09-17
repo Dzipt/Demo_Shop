@@ -1,0 +1,124 @@
+name: Демо интернет-магазина TestOps
+
+on:
+  workflow_dispatch:
+    inputs:
+      ALLURE_JOB_RUN_ID:
+        description: "Служебный параметр TestOps, оставить пустым при ручном запуске"
+        required: false
+      ALLURE_USERNAME:
+        description: "Служебный параметр TestOps, оставить пустым при ручном запуске"
+        required: false
+      BROWSER:
+        description: "Браузер"
+        required: true
+        default: "Chrome"
+        type: choice
+        options:
+          - Chrome
+          - Firefox
+          - Edge
+      CITY:
+        description: "Город"
+        required: true
+        default: "Москва"
+        type: choice
+        options:
+          - Москва
+          - Казань
+          - Новосибирск
+      RELEASE:
+        description: "Версия релиза"
+        required: true
+        default: "2026.09-store-rc1"
+        type: string
+      FLAKY_MODE:
+        description: "Поведение нестабильных тестов"
+        required: true
+        default: "auto"
+        type: choice
+        options:
+          - auto
+          - pass
+          - fail
+      DELAY_SECONDS:
+        description: "Задержка длительных тестов для live-обновления"
+        required: true
+        default: "5"
+        type: string
+      PYTEST_ARGS:
+        description: "Дополнительные аргументы pytest"
+        required: false
+        default: ""
+        type: string
+
+permissions:
+  contents: read
+
+env:
+  ALLURE_ENDPOINT: ${{ vars.ALLURE_ENDPOINT }}
+  ALLURE_PROJECT_ID: ${{ vars.ALLURE_PROJECT_ID }}
+  ALLURE_TOKEN: ${{ secrets.ALLURE_TOKEN }}
+  ALLURE_RESULTS: allure-results
+
+jobs:
+  tests:
+    name: Автотесты интернет-магазина
+    runs-on: ubuntu-latest
+    steps:
+      - name: Получить исходный код
+        uses: actions/checkout@v4
+
+      - name: Настроить Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Установить зависимости
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Установить allurectl
+        uses: allure-framework/setup-allurectl@v1
+
+      - name: Подготовить параметры окружения
+        shell: bash
+        run: |
+          mkdir -p "${ALLURE_RESULTS}"
+          {
+            printf "Browser=%s\n" "${BROWSER}"
+            printf "City=%s\n" "${CITY}"
+          } > "${ALLURE_RESULTS}/environment.properties"
+        env:
+          BROWSER: ${{ inputs.BROWSER || 'Chrome' }}
+          CITY: ${{ inputs.CITY || 'Москва' }}
+
+      - name: Запустить тесты и передать результаты в TestOps
+        continue-on-error: true
+        shell: bash
+        run: |
+          allurectl watch -- \
+            python -m pytest tests \
+              --alluredir="${ALLURE_RESULTS}" \
+              -p no:cacheprovider \
+              ${PYTEST_ARGS}
+        env:
+          ALLURE_JOB_RUN_ID: ${{ inputs.ALLURE_JOB_RUN_ID }}
+          ALLURE_USERNAME: ${{ inputs.ALLURE_USERNAME }}
+          ALLURE_LAUNCH_NAME: "Интернет-магазин - ${{ inputs.RELEASE || '2026.09-store-rc1' }}"
+          SHOP_DEMO_ENV: "${{ inputs.BROWSER || 'Chrome' }} / ${{ inputs.CITY || 'Москва' }}"
+          SHOP_DEMO_RELEASE: ${{ inputs.RELEASE || '2026.09-store-rc1' }}
+          SHOP_DEMO_FLAKY: ${{ inputs.FLAKY_MODE || 'auto' }}
+          SHOP_DEMO_DELAY_SECONDS: ${{ inputs.DELAY_SECONDS || '5' }}
+          PYTEST_ARGS: ${{ inputs.PYTEST_ARGS }}
+
+      - name: Сохранить результаты запуска
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: testops-online-store-${{ github.run_number }}
+          path: ${{ env.ALLURE_RESULTS }}
+          if-no-files-found: warn
+          retention-days: 7
